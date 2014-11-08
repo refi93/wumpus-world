@@ -1,0 +1,2 @@
+5 small.txt 1000
+5 world.txt 0
