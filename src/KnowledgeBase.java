@@ -45,7 +45,16 @@ public class KnowledgeBase {
 		//=====================================================================		
 		
 		// implement backward chaining
+		if (kb.contains(l)) return true;
 		
+		for (Formula a : kb) {
+			if (a.isImplication()){
+				Implication impl = (Implication)a;
+				if (impl.match(l)){ // ak je l na pravej strane implikacie
+					if (ask(impl.getPreconditions())) return true;
+				}
+			}
+		}
 		return false;
 		//=====================================================================
 		//                      STOP MODIFYING HERE 
