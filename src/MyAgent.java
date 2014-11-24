@@ -1,5 +1,7 @@
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Random;
 
 public  class MyAgent extends Agent{	
 	
@@ -20,9 +22,30 @@ public  class MyAgent extends Agent{
 	
 	int r, c, orientation;
 	KnowledgeBase kb;
+	
+	HashMap<Integer, Integer> dir_r, dir_c; // vektory smerov vzhladom na svetove strany
+	int rotation_count;
+	boolean goldGrabbed;
 		
 	public MyAgent(int orientation, int w, int h) {
-		super(orientation);			
+		
+		super(orientation);		
+		
+		rotation_count = 0;
+		goldGrabbed = false;
+		
+		dir_r = new HashMap<Integer, Integer>();
+		dir_c = new HashMap<Integer, Integer>();
+		
+		dir_r.put(NORTH, -1);
+		dir_r.put(SOUTH, 1);
+		dir_r.put(EAST, 0);
+		dir_r.put(WEST, 0);
+		
+		dir_c.put(NORTH, 0);
+		dir_c.put(SOUTH, 0);
+		dir_c.put(EAST, 1);
+		dir_c.put(WEST, -1);	
 		
 		r = h; c = w; this.orientation = orientation;
 		
@@ -176,10 +199,34 @@ public  class MyAgent extends Agent{
 		//=====================================================================
 		//                          MODIFY HERE 
 		//=====================================================================				
+		// ked sme na policko stupili, tak urcite tam neni wumpus
+		a.add(new ParameterLiteral(r, c, "noWumpus", true));
+		a.add(new ParameterLiteral(r, c, "noPit", true));
 		
+		
+		if (percept[BUMP]){
+			a.add(new ParameterLiteral(r, c, "wall", true));
+			r = r - dir_r.get(orientation);
+			c = c - dir_c.get(orientation);
+		}
 		if (percept[BREEZE]){
 			a.add(new ParameterLiteral(r, c, "breeze", true));
-		}	
+		}
+		else{
+			a.add(new ParameterLiteral(r, c, "noBreeze", true));
+		}
+		if (percept[STENCH]){
+			a.add(new ParameterLiteral(r, c, "stench", true));
+		}
+		else{
+			a.add(new ParameterLiteral(r, c, "noStench", true));
+		}
+		
+		if (percept[BUMP]){
+			System.out.println(percept[BUMP]);
+			
+			//return;
+		}
 		
 		//=====================================================================
 		//                      STOP MODIFYING HERE 
@@ -188,15 +235,62 @@ public  class MyAgent extends Agent{
 		kb.tell(a);		
 	}
 
+	public boolean canFW(){
+		if (kb.ask(new ParameterLiteral(r + dir_r.get(orientation), c + dir_c.get(orientation), "wall", true))){
+			return false;
+		}
+		
+		return (kb.ask(new ParameterLiteral(r + dir_r.get(orientation), c + dir_c.get(orientation), "safe", true)));
+	}
+	
+	public boolean cannotFW(){
+		return (kb.ask(new ParameterLiteral(r + dir_r.get(orientation), c + dir_c.get(orientation), "pit", true))) ||
+				(kb.ask(new ParameterLiteral(r + dir_r.get(orientation), c + dir_c.get(orientation), "wumpus", true))) ||
+				(kb.ask(new ParameterLiteral(r + dir_r.get(orientation), c + dir_c.get(orientation), "wall", true)));
+	}
+	
 	private void doAction() {
 		//=====================================================================
 		//                          MODIFY HERE 
 		//=====================================================================			
 		
+		if (goldGrabbed){
+			return;
+		}
 		if (percept[Constants.GLITTER]){
 			pickUp();
+			goldGrabbed = true;
+			return;
 		}else{
-			moveFW();
+			Random rand = new Random();
+			
+			while(true){
+				int x = rand.nextInt() % 2;
+				
+				System.out.println(orientation + " " + r + " " + c);
+				
+				int pomr = r + dir_r.get(orientation);
+				int pomc = c + dir_c.get(orientation);
+				
+				System.out.println("WANT" + pomr + " " + pomc);
+				
+				if (x == 0 && canFW()){
+					moveFW();
+					r = r + dir_r.get(orientation);
+					c = c + dir_c.get(orientation);
+					rotation_count = 0;
+					break;
+				}
+				else if (x == 0 && cannotFW()){
+					continue;
+				}
+				else{
+					turnLEFT();
+					orientation = (orientation - 1 + 4) % 4;
+					rotation_count++;
+					break;
+				}
+			}
 		}
 		
 		//turnLEFT();		
