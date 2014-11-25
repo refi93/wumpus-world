@@ -5,7 +5,7 @@ import java.util.Map;
 public class AgentState {
 	int orientation;
 	Position pos;
-	GlobalPerceptMap map;
+	KnowledgeBase kb;
 	String prevAction;
 	AgentState prevState; // goal state
 	Position dest;
@@ -13,10 +13,10 @@ public class AgentState {
 	
 	Map<Integer, Integer> dir_r, dir_c;
 	
-	public AgentState(Position pos, int orientation, GlobalPerceptMap map, AgentState prevState, String prevAction, int dist, Position dest){
+	public AgentState(Position pos, int orientation, KnowledgeBase kb, AgentState prevState, String prevAction, int dist, Position dest){
 		this.pos = pos;
 		this.orientation = orientation;
-		this.map = map;
+		this.kb = kb;
 		this.prevAction = prevAction;
 		this.prevState = prevState;
 		this.dest = dest;
@@ -24,35 +24,45 @@ public class AgentState {
 		dir_r = new HashMap<Integer, Integer>();
 		dir_c = new HashMap<Integer, Integer>();
 		
-		dir_r.put(World.NORTH, -1);
-		dir_r.put(World.SOUTH, 1);
-		dir_r.put(World.EAST, 0);
-		dir_r.put(World.WEST, 0);
+		dir_r.put(Constants.NORTH, -1);
+		dir_r.put(Constants.SOUTH, 1);
+		dir_r.put(Constants.EAST, 0);
+		dir_r.put(Constants.WEST, 0);
 		
-		dir_c.put(World.NORTH, 0);
-		dir_c.put(World.SOUTH, 0);
-		dir_c.put(World.EAST, 1);
-		dir_c.put(World.WEST, -1);
+		dir_c.put(Constants.NORTH, 0);
+		dir_c.put(Constants.SOUTH, 0);
+		dir_c.put(Constants.EAST, 1);
+		dir_c.put(Constants.WEST, -1);
 		
 		this.dist = dist;
 	}
 	
 	public AgentState rotateLEFT(){
-		return new AgentState(this.pos, (orientation - 1 + 4) % 4, map, this, "rotateLEFT", this.dist + 1, this.dest);
+		return new AgentState(this.pos, (orientation - 1 + 4) % 4, kb, this, "rotateLEFT", this.dist + 1, this.dest);
 	}
 	
 	public AgentState rotateRIGHT(){
-		return new AgentState(this.pos, (orientation + 1) % 4, map, this, "rotateRIGHT", this.dist + 1, this.dest);
+		return new AgentState(this.pos, (orientation + 1) % 4, kb, this, "rotateRIGHT", this.dist + 1, this.dest);
 	}
 	
+	
 	public boolean canFW(){
-		int tile = map.getMap()[pos.r + dir_r.get(orientation)][pos.c + dir_c.get(orientation)];
-		return (tile != World.WALL);
+		if (kb.ask(new ParameterLiteral(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation), "wall", true))){
+			return false;
+		}
+		
+		return (kb.ask(new ParameterLiteral(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation), "safe", true)));
+	}
+	
+	public boolean cannotFW(){
+		return (kb.ask(new ParameterLiteral(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation), "pit", true))) ||
+				(kb.ask(new ParameterLiteral(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation), "wumpus", true))) ||
+				(kb.ask(new ParameterLiteral(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation), "wall", true)));
 	}
 	
 	public AgentState getFW(){
 		if (!canFW()) return null;
-		return new AgentState(new Position(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation)), orientation, map, this, "forward", this.dist + 1, this.dest);
+		return new AgentState(new Position(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation)), orientation, kb, this, "forward", this.dist + 1, this.dest);
 	}
 	
 	// returns value for comparation in heuristics

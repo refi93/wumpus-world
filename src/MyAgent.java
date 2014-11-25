@@ -1,7 +1,12 @@
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.Random;
+import java.util.Set;
 
 public  class MyAgent extends Agent{	
 	
@@ -20,18 +25,28 @@ public  class MyAgent extends Agent{
 	
 	private boolean[] percept = new boolean[5];
 	
-	int r, c, orientation;
+	AgentState myState;
+	Deque<String> actionStack;
 	KnowledgeBase kb;
 	
 	HashMap<Integer, Integer> dir_r, dir_c; // vektory smerov vzhladom na svetove strany
 	int rotation_count;
 	boolean goldGrabbed;
+	boolean[][] visited;
 		
 	public MyAgent(int orientation, int w, int h) {
 		
 		super(orientation);		
 		
-		rotation_count = 0;
+		visited = new boolean[300][300];
+		
+		for (int r = 0; r < 300; r++){
+			for (int c = 0; c < 300; c++){
+				visited[r][c] = false;
+			}
+		}
+		
+		actionStack = new ArrayDeque<String>();
 		goldGrabbed = false;
 		
 		dir_r = new HashMap<Integer, Integer>();
@@ -47,9 +62,19 @@ public  class MyAgent extends Agent{
 		dir_c.put(EAST, 1);
 		dir_c.put(WEST, -1);	
 		
-		r = h; c = w; this.orientation = orientation;
-		
 		createKB();
+		
+		this.myState = 
+				new AgentState(
+						new Position(h, w), // current position (global)
+						orientation, // current orientation
+						kb, // map of World
+						null, // previous state
+						null, // previous action
+						0, // distance from start (in number of actions)
+						new Position(-1, -1) // destination - we have none
+				);
+		
 	}	
 	
 	private void createKB() {
@@ -96,31 +121,19 @@ public  class MyAgent extends Agent{
 		// severozapad
 		axioms.add(new Implication(new ParameterLiteral("wumpus", true),
 				new MatchingLiteral(0, -1, "stench", true), new MatchingLiteral(-1, 0, "stench", true), new MatchingLiteral(-1, -1, "noWumpus", true)));
-		
-		axioms.add(new Implication(new ParameterLiteral("noWumpus", true),
-				new MatchingLiteral(0, -1, "stench", true), new MatchingLiteral(-1, 0, "stench", true), new MatchingLiteral(-1, -1, "wumpus", true)));
-		
+				
 		//severovychod
 		axioms.add(new Implication(new ParameterLiteral("wumpus", true),
 				new MatchingLiteral(-1, 0, "stench", true), new MatchingLiteral(0, 1, "stench", true), new MatchingLiteral(-1, 1, "noWumpus", true)));
 		
-		axioms.add(new Implication(new ParameterLiteral("noWumpus", true),
-				new MatchingLiteral(-1, 0, "stench", true), new MatchingLiteral(0, 1, "stench", true), new MatchingLiteral(-1, 1, "wumpus", true)));
-
 		//juhovychod
 		axioms.add(new Implication(new ParameterLiteral("wumpus", true),
 				new MatchingLiteral(0, 1, "stench", true), new MatchingLiteral(1, 0, "stench", true), new MatchingLiteral(1, 1, "noWumpus", true)));
 		
-		axioms.add(new Implication(new ParameterLiteral(0, 0, "noWumpus", true),
-				new MatchingLiteral(0, 1, "stench", true), new MatchingLiteral(1, 0, "stench", true), new MatchingLiteral(1, 1, "wumpus", true)));
-
 		//juhozapad
 		axioms.add(new Implication(new ParameterLiteral("wumpus", true),
 				new MatchingLiteral(0, -1, "stench", true), new MatchingLiteral(1, 0, "stench", true), new MatchingLiteral(1, -1, "noWumpus", true)));
-		
-		axioms.add(new Implication(new ParameterLiteral("noWumpus", true),
-				new MatchingLiteral(0, -1, "stench", true), new MatchingLiteral(1, 0, "stench", true), new MatchingLiteral(1, -1, "wumpus", true)));
-		
+				
 		
 		// if a tile is neighbour of breeze and over that tile is no pit and the 2 tiles next to it also, our tile is certainly a pit
 		// breeze na vychod
@@ -196,36 +209,33 @@ public  class MyAgent extends Agent{
 	private void writePercept(){
 		ArrayList<Formula> a = new ArrayList<Formula>();
 		
+		visited[myState.pos.r][myState.pos.c] = true;
 		//=====================================================================
 		//                          MODIFY HERE 
 		//=====================================================================				
-		// ked sme na policko stupili, tak urcite tam neni wumpus
-		a.add(new ParameterLiteral(r, c, "noWumpus", true));
-		a.add(new ParameterLiteral(r, c, "noPit", true));
+		
+		// ked sme na policko uspesne stupili, tak urcite tam neni wumpus ani pit
+		a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "noWumpus", true));
+		a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "noPit", true));
+		
 		
 		
 		if (percept[BUMP]){
-			a.add(new ParameterLiteral(r, c, "wall", true));
-			r = r - dir_r.get(orientation);
-			c = c - dir_c.get(orientation);
+			a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "wall", true));
+			myState.pos.r = myState.pos.r - dir_r.get(myState.orientation);
+			myState.pos.c = myState.pos.c - dir_c.get(myState.orientation);
 		}
 		if (percept[BREEZE]){
-			a.add(new ParameterLiteral(r, c, "breeze", true));
+			a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "breeze", true));
 		}
 		else{
-			a.add(new ParameterLiteral(r, c, "noBreeze", true));
+			a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "noBreeze", true));
 		}
 		if (percept[STENCH]){
-			a.add(new ParameterLiteral(r, c, "stench", true));
+			a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "stench", true));
 		}
 		else{
-			a.add(new ParameterLiteral(r, c, "noStench", true));
-		}
-		
-		if (percept[BUMP]){
-			System.out.println(percept[BUMP]);
-			
-			//return;
+			a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "noStench", true));
 		}
 		
 		//=====================================================================
@@ -234,19 +244,58 @@ public  class MyAgent extends Agent{
 											
 		kb.tell(a);		
 	}
-
-	public boolean canFW(){
-		if (kb.ask(new ParameterLiteral(r + dir_r.get(orientation), c + dir_c.get(orientation), "wall", true))){
-			return false;
-		}
-		
-		return (kb.ask(new ParameterLiteral(r + dir_r.get(orientation), c + dir_c.get(orientation), "safe", true)));
+	
+	public boolean isUnknown(int r, int c){
+		boolean ret = kb.ask(new ParameterLiteral(r, c, "wall", true)) ||
+				kb.ask(new ParameterLiteral(r, c, "safe", true));
+		return !ret;
 	}
 	
-	public boolean cannotFW(){
-		return (kb.ask(new ParameterLiteral(r + dir_r.get(orientation), c + dir_c.get(orientation), "pit", true))) ||
-				(kb.ask(new ParameterLiteral(r + dir_r.get(orientation), c + dir_c.get(orientation), "wumpus", true))) ||
-				(kb.ask(new ParameterLiteral(r + dir_r.get(orientation), c + dir_c.get(orientation), "wall", true)));
+	// find nearest not visited safe or at least unknown tile using BFS
+	private AgentState BFS(KnowledgeBase kb, AgentState initState, String goal){
+		initState.dist = 0;
+		if (kb.ask(new ParameterLiteral(initState.pos.r, initState.pos.c, "wall", true))) return null;
+		
+		
+		Queue open = new LinkedList<AgentState>();
+		open.add(initState); // states to visit
+		
+		Set<AgentState> close = new HashSet<AgentState>(); // visited states
+		
+		int counter = 0;
+		while (!open.isEmpty()){
+			AgentState curState = (AgentState) open.remove();
+			if (curState.pos.equals(curState.dest)) {
+				return curState;
+			}
+			else if (!visited[curState.pos.r][curState.pos.c]){ 
+				if (goal.equals("safe")){ // so we don't have specific destination
+					if (kb.ask(new ParameterLiteral(curState.pos.r, curState.pos.c, "safe", true)) &&
+						!kb.ask(new ParameterLiteral(curState.pos.r, curState.pos.c, "wall", true))){
+						return curState;
+					}
+				}
+				else if (goal.equals("unknown")){
+					if (isUnknown(curState.pos.r, curState.pos.c)){
+						return curState;
+					}
+				}
+			}
+			
+			
+			// nechceme rozvijat unknown policka dalej
+			if (!isUnknown(curState.pos.r, curState.pos.c) && !close.contains(curState)){
+				close.add(curState);
+				AgentStateIterator it = new AgentStateIterator(curState);
+				while(it.hasNext()){
+					AgentState pom = it.next();
+					if ((pom != null) && (!close.contains(pom))){
+						open.add(pom);
+					}
+				}
+			}
+		}
+		return null;
 	}
 	
 	private void doAction() {
@@ -255,13 +304,13 @@ public  class MyAgent extends Agent{
 		//=====================================================================			
 		
 		if (goldGrabbed){
-			return;
+			//return;
 		}
 		if (percept[Constants.GLITTER]){
 			pickUp();
 			goldGrabbed = true;
 			return;
-		}else{
+		}/*else{
 			Random rand = new Random();
 			
 			while(true){
@@ -290,6 +339,53 @@ public  class MyAgent extends Agent{
 					rotation_count++;
 					break;
 				}
+			}
+		}*/
+		
+		
+		
+		else if (actionStack.size() == 0){
+			// reset myState previous actions
+			myState.prevAction = null;
+			myState.prevState = null;
+			
+			
+			AgentState goal = null;
+			
+			goal = BFS(
+				kb,
+				myState,
+				"safe"
+			);
+			
+			AgentState cur = goal;
+			
+			if (cur == null){
+				//halt(); // we have no position to visit
+				return;
+			}
+			
+			while(cur.prevAction != null){
+				actionStack.push(cur.prevAction);
+				cur = cur.prevState;
+			}
+		}
+		else{
+			String action = actionStack.pop();
+			if (action == "rotateLEFT"){
+				turnLEFT();
+				myState = myState.rotateLEFT();
+				return;
+			}
+			else if (action == "rotateRIGHT"){
+				turnRIGHT();
+				myState = myState.rotateRIGHT();
+				return;
+			}
+			else if (action == "forward"){
+				moveFW();
+				myState = myState.getFW();
+				return;
 			}
 		}
 		
