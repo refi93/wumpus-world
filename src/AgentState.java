@@ -45,25 +45,10 @@ public class AgentState {
 		return new AgentState(this.pos, (orientation + 1) % 4, kb, this, "rotateRIGHT", this.dist + 1, this.dest);
 	}
 	
-	
-	public boolean canFW(){
-		if (kb.ask(new ParameterLiteral(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation), "wall", true))){
-			return false;
-		}
-		
-		return (kb.ask(new ParameterLiteral(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation), "safe", true)));
-	}
-	
-	public boolean cannotFW(){
-		return (kb.ask(new ParameterLiteral(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation), "pit", true))) ||
-				(kb.ask(new ParameterLiteral(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation), "wumpus", true))) ||
-				(kb.ask(new ParameterLiteral(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation), "wall", true)));
-	}
-	
-	public AgentState getFW(){
-		if (!canFW()) return null;
+	public AgentState getFW(){		
 		return new AgentState(new Position(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation)), orientation, kb, this, "forward", this.dist + 1, this.dest);
 	}
+
 	
 	// returns value for comparation in heuristics
 	public int compVal(){

@@ -245,10 +245,23 @@ public  class MyAgent extends Agent{
 		kb.tell(a);		
 	}
 	
+	public boolean isSafe(int r, int c){
+		if (kb.ask(new ParameterLiteral(r, c, "wall", true))){
+			return false;
+		}
+		
+		return (kb.ask(new ParameterLiteral(r, c, "safe", true)));
+	}
+	
+	public boolean isNotSafe(int r, int c){
+		return (kb.ask(new ParameterLiteral(r, c, "pit", true))) ||
+				(kb.ask(new ParameterLiteral(r, c, "wumpus", true))) ||
+				(kb.ask(new ParameterLiteral(r, c, "wall", true)));
+	}
+	
 	public boolean isUnknown(int r, int c){
-		boolean ret = kb.ask(new ParameterLiteral(r, c, "wall", true)) ||
-				kb.ask(new ParameterLiteral(r, c, "safe", true));
-		return !ret;
+		boolean ret = !isSafe(r, c) && !isNotSafe(r, c);
+		return ret;
 	}
 	
 	// find nearest not visited safe or at least unknown tile using BFS
@@ -280,6 +293,12 @@ public  class MyAgent extends Agent{
 						return curState;
 					}
 				}
+				else if (goal.equals("wumpus")){
+					if (kb.ask(new ParameterLiteral(curState.pos.r, curState.pos.c, "wumpus", true))){
+						curState.prevAction = "killWumpus";
+						return curState;
+					}
+				}
 			}
 			
 			
@@ -289,6 +308,10 @@ public  class MyAgent extends Agent{
 				AgentStateIterator it = new AgentStateIterator(curState);
 				while(it.hasNext()){
 					AgentState pom = it.next();
+					if (goal.equals("safe") && !isSafe(pom.pos.r, pom.pos.c)) continue;
+					else if (goal.equals("unknown") && !isSafe(pom.pos.r, pom.pos.c) && !isUnknown(pom.pos.r, pom.pos.c)) continue;
+					else if (goal.equals("wumpus") && !isSafe(pom.pos.r, pom.pos.c) && !kb.ask(new ParameterLiteral(pom.pos.r, pom.pos.c, "wumpus", true))) continue;
+					
 					if ((pom != null) && (!close.contains(pom))){
 						open.add(pom);
 					}
@@ -310,40 +333,7 @@ public  class MyAgent extends Agent{
 			pickUp();
 			goldGrabbed = true;
 			return;
-		}/*else{
-			Random rand = new Random();
-			
-			while(true){
-				int x = rand.nextInt() % 2;
-				
-				System.out.println(orientation + " " + r + " " + c);
-				
-				int pomr = r + dir_r.get(orientation);
-				int pomc = c + dir_c.get(orientation);
-				
-				System.out.println("WANT" + pomr + " " + pomc);
-				
-				if (x == 0 && canFW()){
-					moveFW();
-					r = r + dir_r.get(orientation);
-					c = c + dir_c.get(orientation);
-					rotation_count = 0;
-					break;
-				}
-				else if (x == 0 && cannotFW()){
-					continue;
-				}
-				else{
-					turnLEFT();
-					orientation = (orientation - 1 + 4) % 4;
-					rotation_count++;
-					break;
-				}
-			}
-		}*/
-		
-		
-		
+		}
 		else if (actionStack.size() == 0){
 			// reset myState previous actions
 			myState.prevAction = null;
@@ -357,6 +347,13 @@ public  class MyAgent extends Agent{
 				myState,
 				"safe"
 			);
+			if (goal == null){
+				goal = BFS(
+						kb,
+						myState,
+						"wumpus"
+					);
+			}
 			
 			AgentState cur = goal;
 			
@@ -385,6 +382,11 @@ public  class MyAgent extends Agent{
 			else if (action == "forward"){
 				moveFW();
 				myState = myState.getFW();
+				return;
+			}
+			else if (action == "killWumpus"){
+				shoot();
+				kb.tell(new Literal("wumpusDead", true)); // zabili sme wumpusa
 				return;
 			}
 		}
