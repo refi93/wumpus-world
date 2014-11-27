@@ -33,11 +33,13 @@ public  class MyAgent extends Agent{
 	int rotation_count;
 	boolean goldGrabbed;
 	boolean[][] visited;
+	Position startPosition;
 		
 	public MyAgent(int orientation, int w, int h) {
 		
 		super(orientation);		
 		
+		startPosition = new Position(w, h);
 		visited = new boolean[300][300];
 		
 		for (int r = 0; r < 300; r++){
@@ -278,8 +280,11 @@ public  class MyAgent extends Agent{
 		int counter = 0;
 		while (!open.isEmpty()){
 			AgentState curState = (AgentState) open.remove();
-			if (curState.pos.equals(curState.dest)) {
-				return curState;
+			
+			if (goal.equals("position")){
+				if (curState.pos.equals(curState.dest)){
+					return curState.climb();
+				}
 			}
 			else if (!visited[curState.pos.r][curState.pos.c]){ 
 				if (goal.equals("safe")){ // so we don't have specific destination
@@ -293,7 +298,7 @@ public  class MyAgent extends Agent{
 						return curState;
 					}
 				}
-				else if (goal.equals("wumpus")){
+				else if (goal.equals("wumpus") && !kb.ask(new Literal("wumpusDead", true))){
 					if (kb.ask(new ParameterLiteral(curState.pos.r, curState.pos.c, "wumpus", true))){
 						curState.prevAction = "killWumpus";
 						return curState;
@@ -347,11 +352,20 @@ public  class MyAgent extends Agent{
 				myState,
 				"safe"
 			);
-			if (goal == null){
+			System.out.println(goal);
+			if (goal == null && !kb.ask(new Literal("wupusDead", true))){
 				goal = BFS(
 						kb,
 						myState,
 						"wumpus"
+					);
+			}
+			if (goal == null){
+				myState.dest = startPosition;
+				goal = BFS(
+						kb,
+						myState,
+						"position"
 					);
 			}
 			
@@ -387,6 +401,10 @@ public  class MyAgent extends Agent{
 			else if (action == "killWumpus"){
 				shoot();
 				kb.tell(new Literal("wumpusDead", true)); // zabili sme wumpusa
+				return;
+			}
+			else if (action == "climb"){
+				climb();
 				return;
 			}
 		}

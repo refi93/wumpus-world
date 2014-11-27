@@ -1,2 +1,4 @@
-5 small.txt 1000
-5 world.txt 0
+10 small.txt 2660
+10 small1.txt 2660
+10 small2.txt 2637
+10 small3.txt 2667

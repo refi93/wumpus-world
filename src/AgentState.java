@@ -45,6 +45,10 @@ public class AgentState {
 		return new AgentState(this.pos, (orientation + 1) % 4, kb, this, "rotateRIGHT", this.dist + 1, this.dest);
 	}
 	
+	public AgentState climb(){
+		return new AgentState(this.pos, orientation, kb, this, "climb", this.dist + 1, this.dest);
+	}
+	
 	public AgentState getFW(){		
 		return new AgentState(new Position(pos.r + dir_r.get(orientation), pos.c + dir_c.get(orientation)), orientation, kb, this, "forward", this.dist + 1, this.dest);
 	}
