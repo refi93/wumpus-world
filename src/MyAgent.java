@@ -180,6 +180,8 @@ public  class MyAgent extends Agent{
 				new MatchingLiteral(0, 0, "noPit", true), new MatchingLiteral(0, 0, "noWumpus", true)));
 		axioms.add(new Implication(new ParameterLiteral("safe", true),
 				new MatchingLiteral(0, 0, "wumpus", true), new Literal("wumpusDead", true)));
+		axioms.add(new Implication(new ParameterLiteral("safe", true),
+				new MatchingLiteral(0, 0, "noPit", true), new Literal("wumpusDead", true)));
 		/*
 		// if the last movement resulted in bump, the tile, on which we think we are, is a wall
 		axioms.add(new Implication(new ParameterLiteral("wall", true),
