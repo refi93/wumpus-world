@@ -43,7 +43,6 @@ public class KnowledgeBase {
 		//=====================================================================
 		//                          MODIFY HERE 
 		//=====================================================================		
-		
 		// implement backward chaining
 		if (kb.contains(l)) return true;
 		

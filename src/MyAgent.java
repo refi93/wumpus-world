@@ -31,7 +31,6 @@ public  class MyAgent extends Agent{
 	
 	HashMap<Integer, Integer> dir_r, dir_c; // vektory smerov vzhladom na svetove strany
 	int rotation_count;
-	boolean goldGrabbed;
 	boolean[][] visited;
 	Position startPosition;
 		
@@ -49,7 +48,6 @@ public  class MyAgent extends Agent{
 		}
 		
 		actionStack = new ArrayDeque<String>();
-		goldGrabbed = false;
 		
 		dir_r = new HashMap<Integer, Integer>();
 		dir_c = new HashMap<Integer, Integer>();
@@ -86,6 +84,8 @@ public  class MyAgent extends Agent{
 		//                          MODIFY HERE 
 		//=====================================================================	
 		
+		
+		axioms.add(new Literal("wumpusAlive", true));
 		// if a tile has not stenching neighbour, then it is certainly not a wumpus
 		axioms.add(new Implication(new ParameterLiteral("noWumpus", true),
 				new MatchingLiteral(1, 0, "noStench", true)));
@@ -117,7 +117,7 @@ public  class MyAgent extends Agent{
 		axioms.add(new Implication(new ParameterLiteral("wumpus", true),
 				new MatchingLiteral(0, 1, "stench", true), new MatchingLiteral(0, -1, "stench", true)));
 		axioms.add(new Implication(new ParameterLiteral("wumpus", true),
-				new MatchingLiteral(0, 1, "stench", true), new MatchingLiteral(0, -1, "stench", true)));
+				new MatchingLiteral(1, 0, "stench", true), new MatchingLiteral(-1, 0, "stench", true)));
 		
 		// pripad po uhlopriecke pre wumpusa
 		// severozapad
@@ -179,7 +179,7 @@ public  class MyAgent extends Agent{
 		axioms.add(new Implication(new ParameterLiteral("safe", true),
 				new MatchingLiteral(0, 0, "noPit", true), new MatchingLiteral(0, 0, "noWumpus", true)));
 		axioms.add(new Implication(new ParameterLiteral("safe", true),
-				new MatchingLiteral(0, 0, "noPit", true), new Literal("wumpusDead", true)));
+				new MatchingLiteral(0, 0, "wumpus", true), new Literal("wumpusDead", true)));
 		/*
 		// if the last movement resulted in bump, the tile, on which we think we are, is a wall
 		axioms.add(new Implication(new ParameterLiteral("wall", true),
@@ -187,7 +187,7 @@ public  class MyAgent extends Agent{
 		
 		// not safe case
 		axioms.add(new Implication(new ParameterLiteral("notSafe", true),
-				new MatchingLiteral(0, 0, "wumpus", true)));
+				new MatchingLiteral(0, 0, "wumpus", true), new Literal("wumpusAlive", true)));
 		
 		axioms.add(new Implication(new ParameterLiteral("notSafe", true),
 				new MatchingLiteral(0, 0, "pit", true)));
@@ -216,8 +216,10 @@ public  class MyAgent extends Agent{
 		//                          MODIFY HERE 
 		//=====================================================================				
 		
-		// ked sme na policko uspesne stupili, tak urcite tam neni wumpus ani pit
-		a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "noWumpus", true));
+		// ked sme na policko uspesne stupili, tak urcite tam neni wumpus ani pit, okrem pripadu, ze sme uz zabili wumpusa a sme na jeho policku
+		if (!kb.ask(new ParameterLiteral(myState.pos.r, myState.pos.c, "wumpus", true))){
+			a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "noWumpus", true));
+		}
 		a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "noPit", true));
 		
 		
@@ -227,12 +229,14 @@ public  class MyAgent extends Agent{
 			myState.pos.r = myState.pos.r - dir_r.get(myState.orientation);
 			myState.pos.c = myState.pos.c - dir_c.get(myState.orientation);
 		}
+		
 		if (percept[BREEZE]){
 			a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "breeze", true));
 		}
 		else{
 			a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "noBreeze", true));
 		}
+		
 		if (percept[STENCH]){
 			a.add(new ParameterLiteral(myState.pos.r, myState.pos.c, "stench", true));
 		}
@@ -256,8 +260,7 @@ public  class MyAgent extends Agent{
 	}
 	
 	public boolean isNotSafe(int r, int c){
-		return (kb.ask(new ParameterLiteral(r, c, "pit", true))) ||
-				(kb.ask(new ParameterLiteral(r, c, "wumpus", true))) ||
+		return (kb.ask(new ParameterLiteral(r, c, "notSafe", true))) ||
 				(kb.ask(new ParameterLiteral(r, c, "wall", true)));
 	}
 	
@@ -288,13 +291,7 @@ public  class MyAgent extends Agent{
 			}
 			else if (!visited[curState.pos.r][curState.pos.c]){ 
 				if (goal.equals("safe")){ // so we don't have specific destination
-					if (kb.ask(new ParameterLiteral(curState.pos.r, curState.pos.c, "safe", true)) &&
-						!kb.ask(new ParameterLiteral(curState.pos.r, curState.pos.c, "wall", true))){
-						return curState;
-					}
-				}
-				else if (goal.equals("unknown")){
-					if (isUnknown(curState.pos.r, curState.pos.c)){
+					if (isSafe(curState.pos.r, curState.pos.c)){
 						return curState;
 					}
 				}
@@ -314,9 +311,7 @@ public  class MyAgent extends Agent{
 				while(it.hasNext()){
 					AgentState pom = it.next();
 					if (goal.equals("safe") && !isSafe(pom.pos.r, pom.pos.c)) continue;
-					else if (goal.equals("unknown") && !isSafe(pom.pos.r, pom.pos.c) && !isUnknown(pom.pos.r, pom.pos.c)) continue;
 					else if (goal.equals("wumpus") && !isSafe(pom.pos.r, pom.pos.c) && !kb.ask(new ParameterLiteral(pom.pos.r, pom.pos.c, "wumpus", true))) continue;
-					
 					if ((pom != null) && (!close.contains(pom))){
 						open.add(pom);
 					}
@@ -329,14 +324,9 @@ public  class MyAgent extends Agent{
 	private void doAction() {
 		//=====================================================================
 		//                          MODIFY HERE 
-		//=====================================================================			
-		
-		if (goldGrabbed){
-			//return;
-		}
+		//=====================================================================
 		if (percept[Constants.GLITTER]){
 			pickUp();
-			goldGrabbed = true;
 			return;
 		}
 		else if (actionStack.size() == 0){
@@ -352,8 +342,7 @@ public  class MyAgent extends Agent{
 				myState,
 				"safe"
 			);
-			System.out.println(goal);
-			if (goal == null && !kb.ask(new Literal("wupusDead", true))){
+			if (goal == null && !kb.ask(new Literal("wumpusDead", true))){
 				goal = BFS(
 						kb,
 						myState,
@@ -401,6 +390,7 @@ public  class MyAgent extends Agent{
 			else if (action == "killWumpus"){
 				shoot();
 				kb.tell(new Literal("wumpusDead", true)); // zabili sme wumpusa
+				kb.remove(new Literal("wumpusAlive", true));
 				return;
 			}
 			else if (action == "climb"){
